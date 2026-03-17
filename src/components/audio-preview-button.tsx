@@ -11,9 +11,32 @@ type Snapshot = {
 
 let activeAudio: HTMLAudioElement | null = null;
 let activeSrc: string | null = null;
+let cachedSnapshot: Snapshot = {
+  activeSrc: null,
+  isPlaying: false,
+};
 const listeners = new Set<() => void>();
 
+function computeSnapshot(): Snapshot {
+  const nextActiveSrc = activeSrc;
+  const nextIsPlaying = activeAudio !== null && !activeAudio.paused;
+
+  if (
+    cachedSnapshot.activeSrc === nextActiveSrc &&
+    cachedSnapshot.isPlaying === nextIsPlaying
+  ) {
+    return cachedSnapshot;
+  }
+
+  cachedSnapshot = {
+    activeSrc: nextActiveSrc,
+    isPlaying: nextIsPlaying,
+  };
+  return cachedSnapshot;
+}
+
 function emit() {
+  computeSnapshot();
   for (const listener of listeners) {
     listener();
   }
@@ -27,10 +50,7 @@ function subscribe(listener: () => void) {
 }
 
 function getSnapshot(): Snapshot {
-  return {
-    activeSrc,
-    isPlaying: activeAudio !== null && !activeAudio.paused,
-  };
+  return computeSnapshot();
 }
 
 function clearActiveAudio() {
