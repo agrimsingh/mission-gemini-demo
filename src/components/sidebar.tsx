@@ -8,7 +8,7 @@ export type View = "library" | "map" | "search";
 const NAV_ITEMS: { id: View; label: string; icon: typeof Disc3 }[] = [
   { id: "library", label: "Library", icon: Disc3 },
   { id: "map", label: "Map", icon: Map },
-  { id: "search", label: "Search", icon: Search },
+  { id: "search", label: "Vibe Search", icon: Search },
 ];
 
 export function Sidebar({

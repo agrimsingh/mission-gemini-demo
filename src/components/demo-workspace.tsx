@@ -1,7 +1,7 @@
 "use client";
 
 import { useAction, useQuery } from "convex/react";
-import { useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { Providers } from "./providers";
@@ -15,6 +15,7 @@ import type { TrackSummary, MapTrack } from "./track-table";
 export type SearchMatch = TrackSummary & { score: number };
 
 const EMPTY_MAP_TRACKS: MapTrack[] = [];
+const EMPTY_HYDRATING_TRACK_IDS: ReadonlySet<Id<"tracks">> = new Set();
 
 function ConnectedWorkspace() {
   const tracks = useQuery(api.tracks.listTracks, {}) as
@@ -24,56 +25,80 @@ function ConnectedWorkspace() {
     | MapTrack[]
     | undefined;
 
+  const ensureTrackDetails = useAction(api.descriptions.ensureTrackDetails);
   const searchByPrompt = useAction(api.search.searchByPrompt);
-  const getSimilarTracks = useAction(api.search.getSimilarTracks);
 
   const [activeView, setActiveView] = useState<View>("library");
   const [prompt, setPrompt] = useState("");
   const [selectedTrackId, setSelectedTrackId] = useState<Id<"tracks"> | null>(
     null,
   );
-  const [selectedTrackTitle, setSelectedTrackTitle] = useState<string | null>(
-    null,
-  );
   const [promptResults, setPromptResults] = useState<SearchMatch[]>([]);
-  const [similarResults, setSimilarResults] = useState<SearchMatch[]>([]);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [hydratingTrackIds, setHydratingTrackIds] = useState<
+    ReadonlySet<Id<"tracks">>
+  >(() => EMPTY_HYDRATING_TRACK_IDS);
   const [isPending, startTransition] = useTransition();
+  const hydratingTrackIdsRef = useRef<Set<Id<"tracks">>>(new Set());
 
-  const readyCount = useMemo(
-    () => tracks?.filter((t) => t.status === "ready").length ?? 0,
-    [tracks],
-  );
+  const readyCount = tracks?.filter((track) => track.status === "ready").length ?? 0;
+  const promptMatchIds = promptResults.map((result) => result._id);
 
-  const promptMatchIds = useMemo(
-    () => promptResults.map((r) => r._id),
-    [promptResults],
-  );
+  useEffect(() => {
+    if (!tracks || tracks.length === 0) {
+      return;
+    }
 
-  function loadNeighbors(trackId: Id<"tracks">, trackTitle: string) {
-    startTransition(async () => {
-      setSearchError(null);
-      try {
-        const results = (await getSimilarTracks({
-          trackId,
-          limit: 6,
-        })) as SearchMatch[];
+    const nextBatch = tracks
+      .filter(
+        (track) =>
+          track.status === "ready" &&
+          (track.bpmCheckedAt === undefined ||
+            (!track.description && !track.descriptionError)) &&
+          !hydratingTrackIdsRef.current.has(track._id),
+      )
+      .slice(0, 2);
 
-        setSelectedTrackId(trackId);
-        setSelectedTrackTitle(trackTitle);
-        setSimilarResults(results);
-        setActiveView("search");
-      } catch (error) {
-        setSearchError(
-          error instanceof Error
-            ? error.message
-            : "Could not load similar tracks.",
-        );
-      }
+    if (nextBatch.length === 0) {
+      return;
+    }
+
+    const nextIds = nextBatch.map((track) => track._id);
+    nextIds.forEach((trackId) => hydratingTrackIdsRef.current.add(trackId));
+    setHydratingTrackIds((current) => {
+      const next = new Set(current);
+      nextIds.forEach((trackId) => next.add(trackId));
+      return next;
     });
-  }
 
-  function handleSearch() {
+    void Promise.allSettled(
+      nextBatch.map(async (track) => {
+        await ensureTrackDetails({ trackId: track._id }).catch(() => undefined);
+      }),
+    ).finally(() => {
+      nextIds.forEach((trackId) => hydratingTrackIdsRef.current.delete(trackId));
+      setHydratingTrackIds((current) => {
+        if (current.size === 0) {
+          return current;
+        }
+
+        const next = new Set(current);
+        nextIds.forEach((trackId) => next.delete(trackId));
+        return next.size === 0 ? EMPTY_HYDRATING_TRACK_IDS : next;
+      });
+    });
+  }, [ensureTrackDetails, tracks]);
+
+  const openTrackOnMap = useCallback((trackId: Id<"tracks">) => {
+    setSelectedTrackId(trackId);
+    setActiveView("map");
+  }, []);
+
+  const selectTrackOnMap = useCallback((track: MapTrack) => {
+    setSelectedTrackId(track._id);
+  }, []);
+
+  const handleSearch = useCallback(() => {
     startTransition(async () => {
       setSearchError(null);
       try {
@@ -90,7 +115,7 @@ function ConnectedWorkspace() {
         );
       }
     });
-  }
+  }, [prompt, searchByPrompt]);
 
   return (
     <AppShell
@@ -102,15 +127,18 @@ function ConnectedWorkspace() {
         <LibraryView
           tracks={tracks}
           isPending={isPending}
-          onFindNeighbors={loadNeighbors}
+          hydratingTrackIds={hydratingTrackIds}
+          onExploreOnMap={openTrackOnMap}
         />
       )}
       {activeView === "map" && (
         <MapView
           tracks={mapTracks ?? EMPTY_MAP_TRACKS}
+          trackSummaries={tracks ?? []}
           selectedTrackId={selectedTrackId}
           highlightedTrackIds={promptMatchIds}
-          onSelectTrack={(track) => loadNeighbors(track._id, track.title)}
+          hydratingTrackIds={hydratingTrackIds}
+          onSelectTrack={selectTrackOnMap}
         />
       )}
       {activeView === "search" && (
@@ -121,8 +149,6 @@ function ConnectedWorkspace() {
           isPending={isPending}
           searchError={searchError}
           promptResults={promptResults}
-          similarResults={similarResults}
-          selectedTrackTitle={selectedTrackTitle}
         />
       )}
     </AppShell>

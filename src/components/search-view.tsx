@@ -1,10 +1,10 @@
 "use client";
 
 import { cn } from "@/lib/cn";
-import { formatSeconds } from "@/lib/format";
-import { describeSimilarity } from "@/lib/similarity";
-import { Search, Sparkles, GitBranch, AlertCircle } from "lucide-react";
+import { formatBpm, formatSeconds } from "@/lib/format";
+import { Search, Sparkles, AlertCircle } from "lucide-react";
 import type { SearchMatch } from "./demo-workspace";
+import { AudioPreviewButton } from "./audio-preview-button";
 
 export function SearchView({
   prompt,
@@ -13,8 +13,6 @@ export function SearchView({
   isPending,
   searchError,
   promptResults,
-  similarResults,
-  selectedTrackTitle,
 }: {
   prompt: string;
   onPromptChange: (value: string) => void;
@@ -22,21 +20,17 @@ export function SearchView({
   isPending: boolean;
   searchError: string | null;
   promptResults: SearchMatch[];
-  similarResults: SearchMatch[];
-  selectedTrackTitle: string | null;
 }) {
   const hasPromptResults = promptResults.length > 0;
-  const hasNeighborResults = similarResults.length > 0;
 
   return (
     <div className="mx-auto max-w-5xl space-y-8 px-6 py-8">
       <div>
         <h1 className="font-display text-2xl font-700 tracking-tight text-text-primary text-balance">
-          Search
+          Vibe Search
         </h1>
         <p className="mt-1 text-sm text-text-secondary text-pretty">
-          Describe a vibe and find matching tracks, or explore neighbors from the
-          library.
+          Describe a vibe and pull back the closest matching tracks.
         </p>
       </div>
 
@@ -86,20 +80,11 @@ export function SearchView({
         />
       )}
 
-      {hasNeighborResults && (
-        <ResultSection
-          icon={<GitBranch className="size-4 text-text-secondary" />}
-          title={`Neighbors of "${selectedTrackTitle}"`}
-          results={similarResults}
-        />
-      )}
-
-      {!hasPromptResults && !hasNeighborResults && (
+      {!hasPromptResults && (
         <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border py-20 text-center">
           <Search className="size-7 text-text-tertiary/40" />
           <p className="text-sm text-text-tertiary">
-            Run a vibe prompt or select a track from the library to find
-            neighbors.
+            Describe a vibe to find matching tracks.
           </p>
         </div>
       )}
@@ -129,7 +114,7 @@ function ResultSection({
       </div>
 
       <div className="space-y-1.5">
-        {results.map((result) => (
+        {results.map((result, index) => (
           <div
             key={result._id}
             className="rounded-lg border border-border bg-surface-1 px-4 py-3 transition-colors duration-100 hover:bg-surface-2"
@@ -142,15 +127,22 @@ function ResultSection({
                 <p className="mt-0.5 text-sm text-text-tertiary">
                   {result.artist || "Unknown"} ·{" "}
                   {formatSeconds(result.durationSec)}
+                  {result.bpm !== undefined ? ` · ${formatBpm(result.bpm)}` : ""}
                 </p>
+                {result.description ? (
+                  <p className="mt-1 text-xs text-text-secondary">
+                    {result.description}
+                  </p>
+                ) : null}
               </div>
               <div className="shrink-0 text-right">
                 <p className="text-sm font-600 tabular-nums text-text-primary">
                   {result.score.toFixed(4)}
                 </p>
-                <p className="text-xs text-text-tertiary">
-                  {describeSimilarity(result.score)}
-                </p>
+                <p className="text-xs text-text-tertiary">#{index + 1}</p>
+                <div className="mt-2 flex justify-end">
+                  <AudioPreviewButton src={result.excerptAudioUrl} />
+                </div>
               </div>
             </div>
           </div>

@@ -50,6 +50,23 @@ function normalizeVector(values: number[]): number[] {
   return values.map((value) => value / magnitude);
 }
 
+function sanitizeDescription(text: string): string {
+  return text
+    .replace(
+      /\b(?:around|about|roughly|approximately|clocking in at|clocking in around|at)\s+\d{2,3}(?:\s*[-–]\s*\d{2,3})?\s*bpm\b/gi,
+      "",
+    )
+    .replace(/\b\d{2,3}(?:\s*[-–]\s*\d{2,3})?\s*bpm\b/gi, "")
+    .replace(
+      /\b(?:tempo|up[- ]tempo|mid[- ]tempo|tempo feel|tempo range)\b/gi,
+      "",
+    )
+    .replace(/\s+,/g, ",")
+    .replace(/\s+\./g, ".")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 export async function embedAudioBlob(blob: Blob): Promise<number[]> {
   const client = getGeminiClient();
   const arrayBuffer = await blob.arrayBuffer();
@@ -86,4 +103,44 @@ export async function embedTextQuery(prompt: string): Promise<number[]> {
   })) as EmbeddingResponseShape;
 
   return normalizeVector(getEmbeddingValues(response));
+}
+
+export async function describeAudioBlob(blob: Blob): Promise<string> {
+  const client = getGeminiClient();
+  const arrayBuffer = await blob.arrayBuffer();
+  const base64Data = Buffer.from(arrayBuffer).toString("base64");
+  const response = await client.models.generateContent({
+    model: "gemini-3.1-flash-lite-preview",
+    contents: [
+      {
+        parts: [
+          {
+            inlineData: {
+              mimeType: blob.type || "audio/mpeg",
+              data: base64Data,
+            },
+          },
+          {
+            text: [
+              "You are a veteran DJ writing private crate notes.",
+              "Write exactly 2 concise sentences.",
+              'Do NOT guess or name a precise genre/subgenre unless it is extremely obvious.',
+              "Prioritize observable sonic attributes: bassline shape, percussion character, vocal treatment, synth/pad texture, tension/release, and likely set placement.",
+              "Avoid taxonomy words if uncertain; prefer phrases like rolling low-end, metallic hats, filtered stabs, spacious pads, chopped vocal fragments.",
+              "Do not mention BPM, tempo numbers, track title, or artist.",
+            ].join(" "),
+          },
+        ],
+      },
+    ],
+  });
+
+  const text =
+    typeof response.text === "string" ? response.text.trim() : String(response.text ?? "").trim();
+
+  if (!text) {
+    throw new Error("Gemini did not return a usable description.");
+  }
+
+  return sanitizeDescription(text);
 }

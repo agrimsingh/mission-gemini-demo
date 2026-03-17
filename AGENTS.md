@@ -17,9 +17,11 @@
 - Styling: Tailwind CSS v4 with @theme tokens, clsx + tailwind-merge via cn() utility
 - Icons: lucide-react
 - Animations: motion/react (formerly framer-motion)
-- Audio processing: browser-side excerpt extraction (~80s from ~35% into track), no server-side ffmpeg
+- Audio processing: client-side `ffmpeg.wasm` probes source files, reads `TBPM` metadata when present, trims ~80s excerpts from ~35% into the track, and normalizes excerpts to MP3 before embedding; no server-side ffmpeg
 - Convex serves as both the database and vector search engine (no separate vector DB)
 - Gemini model for embeddings: gemini-embedding-2-preview, 1536-dimensional vectors
-- App architecture: sidebar nav with 3 focused views (Library, Map, Search) via client-side view switching
+- App architecture: sidebar nav with 3 focused views via client-side view switching; `Vibe Search` is prompt-only, while Map owns track-to-track exploration and nearest-neighbor inspection
 - Color palette: pure black surface scale (#000/#0a0a0a/#111/#1a1a1a), white/gray text hierarchy, accent #d4d4d4
 - Supported audio formats: mp3, wav, aiff, flac, m4a, aac, ogg, opus
+- Track ingest dedupes exact re-uploads via SHA-256 source fingerprints, with a maintenance action to backfill and remove legacy duplicate rows
+- Track details auto-hydrate in the background for ready tracks: BPM is backfilled from original-file metadata via `music-metadata`, crate notes use genre-deemphasized `gemini-3.1-flash-lite-preview` with tempo references scrubbed, preview playback streams the normalized excerpt MP3 for lowest latency, and `maintenance:backfillTrackDetails` populates existing Convex tracks

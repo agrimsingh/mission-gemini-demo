@@ -6,7 +6,7 @@ The whole thing runs on Convex as both the database and vector search engine —
 
 ## How it works
 
-1. You drop audio files into the browser. The app extracts an 80-second representative excerpt from each track (starting ~35% in, not the intro) and uploads both the original and the excerpt to Convex storage.
+1. You drop audio files into the browser. The app hashes each source file, skips tracks that already exist in the library, then uses ffmpeg.wasm to probe the file, trim an 80-second representative excerpt from each track (starting ~35% in, not the intro), transcode that excerpt to MP3, and upload both the original and the excerpt to Convex storage.
 
 2. Convex schedules a background job that sends the excerpt to Gemini's `gemini-embedding-2-preview` model. The resulting 1536-dim vector gets stored alongside the track.
 
@@ -47,16 +47,23 @@ npm run dev
 
 Open `http://localhost:3000`. Upload some tracks (the more the better — 50+ gives you a more interesting map) and wait for embeddings to finish.
 
+If you already imported tracks before duplicate protection existed, run this once to backfill fingerprints and remove duplicate rows:
+
+```bash
+npx convex run maintenance:backfillTrackFingerprintsAndDedupe
+```
+
 ## Project structure
 
 ```
 src/
   app/            Next.js app router (layout, page, globals.css)
   components/     UI — sidebar, views (library, map, search), upload panel, track table
-  lib/            Utilities — PCA projection, audio excerpting, formatting
+  lib/            Utilities — PCA projection, ffmpeg excerpting, formatting
 
 convex/
   schema.ts       Tracks table with vector index, embedding jobs table
+  maintenance.ts  One-shot maintenance actions like fingerprint backfill + dedupe
   uploads.ts      File upload + track creation
   embeddings.ts   Background action that calls Gemini
   search.ts       Text-to-audio and track-to-track vector search
@@ -66,7 +73,8 @@ convex/
 
 ## Notes
 
-- The browser handles audio decoding and excerpt extraction. No ffmpeg needed server-side.
-- Gemini's embedding endpoint accepts mp3 and wav. The excerpt step always produces wav, so any input format works.
+- The browser handles audio probing, trimming, and transcoding with ffmpeg.wasm. No ffmpeg needed server-side.
+- Excerpts are always normalized to MP3 before embedding, even if the source file was AIFF, WAV, FLAC, or something else the browser batch import accepts.
+- Source files are fingerprinted with SHA-256 so re-importing the exact same track gets skipped instead of creating duplicate rows.
 - Convex's vector index uses cosine similarity. The vectors are L2-normalized before storage.
 - With only a few tracks, the PCA map won't look like much. The neighborhoods get interesting around 50-60 tracks.

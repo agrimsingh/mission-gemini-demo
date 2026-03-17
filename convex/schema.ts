@@ -19,8 +19,12 @@ export default defineSchema({
   tracks: defineTable({
     title: v.string(),
     artist: v.optional(v.string()),
+    sourceFingerprint: v.optional(v.string()),
     sourceFileName: v.string(),
+    bpm: v.optional(v.float64()),
+    bpmCheckedAt: v.optional(v.number()),
     originalMimeType: v.string(),
+    excerptMimeType: v.string(),
     originalStorageId: v.id("_storage"),
     excerptStorageId: v.id("_storage"),
     durationSec: v.float64(),
@@ -35,11 +39,16 @@ export default defineSchema({
     ),
     status: trackStatus,
     error: v.optional(v.string()),
+    description: v.optional(v.string()),
+    descriptionError: v.optional(v.string()),
+    embeddingStartedAt: v.optional(v.number()),
+    embeddingCompletedAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_status", ["status"])
     .index("by_createdAt", ["createdAt"])
+    .index("by_sourceFingerprint", ["sourceFingerprint"])
     .vectorIndex("by_embedding", {
       vectorField: "embedding",
       dimensions: 1536,

@@ -1,0 +1,125 @@
+"use client";
+
+import { useSyncExternalStore } from "react";
+import { Play, Pause } from "lucide-react";
+import { cn } from "@/lib/cn";
+
+type Snapshot = {
+  activeSrc: string | null;
+  isPlaying: boolean;
+};
+
+let activeAudio: HTMLAudioElement | null = null;
+let activeSrc: string | null = null;
+const listeners = new Set<() => void>();
+
+function emit() {
+  for (const listener of listeners) {
+    listener();
+  }
+}
+
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+function getSnapshot(): Snapshot {
+  return {
+    activeSrc,
+    isPlaying: activeAudio !== null && !activeAudio.paused,
+  };
+}
+
+function clearActiveAudio() {
+  if (!activeAudio) {
+    return;
+  }
+
+  activeAudio.onplay = null;
+  activeAudio.onpause = null;
+  activeAudio.onended = null;
+  activeAudio.onerror = null;
+  activeAudio.pause();
+  activeAudio = null;
+  activeSrc = null;
+}
+
+async function togglePreview(src: string) {
+  if (activeAudio && activeSrc === src) {
+    if (activeAudio.paused) {
+      await activeAudio.play();
+    } else {
+      activeAudio.pause();
+    }
+    emit();
+    return;
+  }
+
+  clearActiveAudio();
+
+  const audio = new Audio(src);
+  audio.preload = "auto";
+  audio.onplay = emit;
+  audio.onpause = emit;
+  audio.onended = () => {
+    clearActiveAudio();
+    emit();
+  };
+  audio.onerror = () => {
+    clearActiveAudio();
+    emit();
+  };
+
+  activeAudio = audio;
+  activeSrc = src;
+  emit();
+
+  try {
+    await audio.play();
+  } catch (error) {
+    clearActiveAudio();
+    emit();
+    throw error;
+  }
+}
+
+export function AudioPreviewButton({
+  src,
+  className,
+}: {
+  src?: string;
+  className?: string;
+}) {
+  const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+  const isCurrent = !!src && snapshot.activeSrc === src;
+  const isPlaying = isCurrent && snapshot.isPlaying;
+
+  return (
+    <button
+      type="button"
+      disabled={!src}
+      onClick={() => {
+        if (!src) {
+          return;
+        }
+
+        void togglePreview(src);
+      }}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-500 transition-colors duration-100",
+        "active:scale-[0.97] active:transition-transform active:duration-75",
+        src
+          ? "bg-surface-3 text-text-primary hover:bg-surface-2"
+          : "cursor-not-allowed text-text-tertiary opacity-40",
+        className,
+      )}
+      aria-label={isPlaying ? "Pause audio preview" : "Play audio preview"}
+    >
+      {isPlaying ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
+      <span>{isPlaying ? "Pause" : "Preview"}</span>
+    </button>
+  );
+}

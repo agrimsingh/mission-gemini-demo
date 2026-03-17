@@ -11,11 +11,19 @@ type SearchableTrack = {
   title: string;
   artist?: string;
   sourceFileName: string;
+  bpm?: number;
+  bpmCheckedAt?: number;
+  excerptMimeType: string;
+  excerptAudioUrl?: string;
   durationSec: number;
   excerptStartSec: number;
   excerptDurationSec: number;
   status: "uploaded" | "embedding" | "ready" | "failed";
   error?: string;
+  description?: string;
+  descriptionError?: string;
+  embeddingStartedAt?: number;
+  embeddingCompletedAt?: number;
   createdAt: number;
   updatedAt: number;
 };
@@ -29,6 +37,10 @@ const matchValidator = v.object({
   title: v.string(),
   artist: v.optional(v.string()),
   sourceFileName: v.string(),
+  bpm: v.optional(v.float64()),
+  bpmCheckedAt: v.optional(v.number()),
+  excerptMimeType: v.string(),
+  excerptAudioUrl: v.optional(v.string()),
   durationSec: v.float64(),
   excerptStartSec: v.float64(),
   excerptDurationSec: v.float64(),
@@ -39,6 +51,10 @@ const matchValidator = v.object({
     v.literal("failed"),
   ),
   error: v.optional(v.string()),
+  description: v.optional(v.string()),
+  descriptionError: v.optional(v.string()),
+  embeddingStartedAt: v.optional(v.number()),
+  embeddingCompletedAt: v.optional(v.number()),
   createdAt: v.number(),
   updatedAt: v.number(),
   score: v.float64(),
