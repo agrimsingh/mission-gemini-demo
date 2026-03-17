@@ -30,6 +30,9 @@ function ConnectedWorkspace() {
 
   const [activeView, setActiveView] = useState<View>("library");
   const [prompt, setPrompt] = useState("");
+  const [lastSubmittedPrompt, setLastSubmittedPrompt] = useState<string | null>(
+    null,
+  );
   const [selectedTrackId, setSelectedTrackId] = useState<Id<"tracks"> | null>(
     null,
   );
@@ -98,12 +101,19 @@ function ConnectedWorkspace() {
     setSelectedTrackId(track._id);
   }, []);
 
-  const handleSearch = useCallback(() => {
+  const runPromptSearch = useCallback((rawPrompt: string) => {
+    const nextPrompt = rawPrompt.trim();
+    if (!nextPrompt) {
+      return;
+    }
+
     startTransition(async () => {
       setSearchError(null);
+      setLastSubmittedPrompt(nextPrompt);
+      setPromptResults([]);
       try {
         const results = (await searchByPrompt({
-          prompt: prompt.trim(),
+          prompt: nextPrompt,
           limit: 6,
         })) as SearchMatch[];
 
@@ -115,7 +125,30 @@ function ConnectedWorkspace() {
         );
       }
     });
-  }, [prompt, searchByPrompt]);
+  }, [searchByPrompt]);
+
+  const handleSearch = useCallback(() => {
+    runPromptSearch(prompt);
+  }, [prompt, runPromptSearch]);
+
+  const handleTryExample = useCallback(
+    (examplePrompt: string) => {
+      setPrompt(examplePrompt);
+      runPromptSearch(examplePrompt);
+    },
+    [runPromptSearch],
+  );
+
+  const showPromptMatchesOnMap = useCallback(() => {
+    if (promptResults.length === 0) {
+      return;
+    }
+
+    setActiveView("map");
+    if (promptResults[0]) {
+      setSelectedTrackId(promptResults[0]._id);
+    }
+  }, [promptResults]);
 
   return (
     <AppShell
@@ -146,8 +179,11 @@ function ConnectedWorkspace() {
           prompt={prompt}
           onPromptChange={setPrompt}
           onSearch={handleSearch}
+          onTryExample={handleTryExample}
+          onShowOnMap={showPromptMatchesOnMap}
           isPending={isPending}
           searchError={searchError}
+          lastSubmittedPrompt={lastSubmittedPrompt}
           promptResults={promptResults}
         />
       )}

@@ -53,7 +53,7 @@ const STATUS_STYLES: Record<string, string> = {
     "bg-danger-muted text-danger",
 };
 
-const TABLE_COLUMN_COUNT = 6;
+const TABLE_COLUMN_COUNT = 5;
 const TRACK_ROW_HEIGHT = 80;
 const ROW_OVERSCAN = 6;
 
@@ -156,7 +156,14 @@ export function TrackTable({
       onScroll={handleScroll}
       className="max-h-[68vh] overflow-auto rounded-2xl border border-border"
     >
-      <table className="w-full border-collapse">
+      <table className="w-full min-w-[940px] table-fixed border-collapse">
+        <colgroup>
+          <col style={{ width: "44%" }} />
+          <col style={{ width: "9%" }} />
+          <col style={{ width: "12%" }} />
+          <col style={{ width: "8%" }} />
+          <col style={{ width: "27%" }} />
+        </colgroup>
         <thead>
           <tr className="sticky top-0 z-10 border-b border-border bg-surface-1">
             <th className="px-4 py-3 text-left text-xs font-600 uppercase tracking-wider text-text-tertiary">
@@ -170,9 +177,6 @@ export function TrackTable({
             </th>
             <th className="hidden px-4 py-3 text-left text-xs font-600 uppercase tracking-wider text-text-tertiary lg:table-cell">
               BPM
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-600 uppercase tracking-wider text-text-tertiary">
-              Status
             </th>
             <th className="px-4 py-3" />
           </tr>
@@ -235,19 +239,22 @@ export function TrackTable({
                   {bpmLabel ?? "—"}
                 </td>
                 <td className="px-4 py-3">
-                  <span
-                    className={cn(
-                      "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-500 capitalize",
-                      STATUS_STYLES[track.status],
+                  <div className="flex items-center justify-end gap-2 whitespace-nowrap">
+                    {track.status !== "ready" && (
+                      <span
+                        className={cn(
+                          "inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-500 capitalize",
+                          STATUS_STYLES[track.status],
+                        )}
+                      >
+                        {track.status}
+                      </span>
                     )}
-                  >
-                    {track.status}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center justify-end gap-2">
                     <div onClick={(event) => event.stopPropagation()}>
-                      <AudioPreviewButton src={track.excerptAudioUrl} />
+                      <AudioPreviewButton
+                        src={track.excerptAudioUrl}
+                        size="compact"
+                      />
                     </div>
                     <button
                       disabled={track.status !== "ready" || isPending}
@@ -256,7 +263,7 @@ export function TrackTable({
                         onExploreOnMap(track._id);
                       }}
                       className={cn(
-                        "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-500 transition-colors duration-100",
+                        "inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-500 transition-colors duration-100",
                         "active:scale-[0.97] active:transition-transform active:duration-75",
                         track.status === "ready"
                           ? "bg-accent-muted text-accent hover:bg-accent-strong"
@@ -265,7 +272,7 @@ export function TrackTable({
                       aria-label={`Explore ${track.title} on map`}
                     >
                       <span className="hidden sm:inline">Explore</span>
-                      <ArrowRight className="size-3.5" />
+                      <ArrowRight className="size-3" />
                     </button>
                   </div>
                 </td>

@@ -109,9 +109,11 @@ async function togglePreview(src: string) {
 export function AudioPreviewButton({
   src,
   className,
+  size = "default",
 }: {
   src?: string;
   className?: string;
+  size?: "default" | "compact";
 }) {
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
   const isCurrent = !!src && snapshot.activeSrc === src;
@@ -129,8 +131,11 @@ export function AudioPreviewButton({
         void togglePreview(src);
       }}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-500 transition-colors duration-100",
+        "inline-flex items-center rounded-lg font-500 transition-colors duration-100",
         "active:scale-[0.97] active:transition-transform active:duration-75",
+        size === "compact"
+          ? "gap-1 px-2 py-1 text-[11px]"
+          : "gap-1.5 px-3 py-1.5 text-xs",
         src
           ? "bg-surface-3 text-text-primary hover:bg-surface-2"
           : "cursor-not-allowed text-text-tertiary opacity-40",
@@ -138,7 +143,11 @@ export function AudioPreviewButton({
       )}
       aria-label={isPlaying ? "Pause audio preview" : "Play audio preview"}
     >
-      {isPlaying ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
+      {isPlaying ? (
+        <Pause className={size === "compact" ? "size-3" : "size-3.5"} />
+      ) : (
+        <Play className={size === "compact" ? "size-3" : "size-3.5"} />
+      )}
       <span>{isPlaying ? "Pause" : "Preview"}</span>
     </button>
   );
